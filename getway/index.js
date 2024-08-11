@@ -1,9 +1,10 @@
+require('dotenv').config();
+require('dotenv').config({path:`.env.${process.env.ENVIRONMENT ||'dev'}`});
 const http = require("http");
 const app = require('./app/app');
 const culster = require("cluster");
 const os = require("os");
 const redis = require('./lib/redis-config');
-
 const numCpu = os.cpus().length;
 const server = http.createServer(app);
 app.get('/', (req, res) => {
@@ -18,8 +19,8 @@ if (culster.isMaster) {
     })
 }
 else {
-    server.listen(3000, () => {
-        console.log(`Hello server runing with : ${process.pid} : 3000`);
+    server.listen(process.env.PORT || 3100, () => {
+        console.log(`Hello server runing with : ${process.pid} : ${process.env.PORT || 3100}`);
         redis.client.connect();
     })
 }

@@ -34,9 +34,9 @@ app.use(helmet())
 app.use(express.json())
 app.use(xss())
 app.use(hpp())
-app.use('/api/v1/auth',authorization, proxy('http://localhost:3001',proxyOptions));
-app.use('/api/v1/user', proxy('http://localhost:3001'));
-app.use('/api/v1/project',authorization, proxy('http://localhost:3002',proxyOptions));
+app.use('/api/v1/auth',authorization, proxy(process.env.AUTH_URL, proxyOptions));
+app.use('/api/v1/user', proxy(process.env.AUTH_URL));
+app.use('/api/v1/project',authorization, proxy(process.env.PROJECT_URL, proxyOptions));
 app.use('/', proxy('http://localhost:3003'));
 
 app.use((err, req, res, next) => {

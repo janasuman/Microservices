@@ -1,45 +1,143 @@
 version: '3.9'
 
+networks:
+  my_custom_network:
+
 services:
+  broker:
+    image: rabbitmq:3-management
+    networks:
+      - my_custom_network
+    restart: on-failure
+    environment:
+      RABBITMQ_DEFAULT_USER: "rabbitmq"
+      RABBITMQ_DEFAULT_PASS: "rabbitmq"
+    ports:
+      - "15672:15672"  # Management interface
+      - "5672:5672"    # AMQP port
+    container_name: broker
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   db:
     image: postgres
-    # set shared memory limit when using docker-compose
     shm_size: 128mb
+    networks:
+      - my_custom_network
+    ports:
+      - "5432:5432"
     volumes: 
       - db_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_PASSWORD: welcome
       POSTGRES_DB: db_v1
-    container_name: postgres_db1
+    container_name: db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-  Auth:
+  redis:
+    image: redis:7.4.0-alpine
+    networks:
+      - my_custom_network
+    ports:
+      - '6380:6379' 
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  getway:
+    build:
+      context: getway
+      dockerfile: Dockerfile
+    networks:
+      - my_custom_network
+    ports:
+      - 3000:3000
+    restart: on-failure
+    env_file:
+      - getway/.env
+    container_name: getway
+    depends_on:
+      broker:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # auth:
+      #   condition: service_healthy
+      # project:
+      #   condition: service_healthy
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+    #   interval: 30s
+    #   timeout: 30s
+    #   retries: 3
+    #   start_period: 50s
+
+  auth:
     build:
       context: Auth
       dockerfile: Dockerfile
-    ports:
-      - 3000:3000
-    env_file:
-      - Auth/.env.uat
-    container_name: Auth
-    depends_on:
-      - db
-  Project:
-    build:
-      context: Project
-      dockerfile: Dockerfile
+    restart: on-failure
+    networks:
+      - my_custom_network
     ports:
       - 3001:3001
     env_file:
-      - Project/.env.uat
-    container_name: Project
+      - Auth/.env
+    container_name: Auth
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      getway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-  nginxgw:
-    image: nginx
-    command: service nginx start
+  project:
+    build:
+      context: Project
+      dockerfile: Dockerfile
+    restart: on-failure
+    networks:
+      - my_custom_network
     ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
+      - 3002:3002
+    env_file:
+      - Project/.env
+    container_name: Project
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      getway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 volumes:
   db_data:
+

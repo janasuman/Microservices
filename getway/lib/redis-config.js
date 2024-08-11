@@ -3,7 +3,7 @@ const redis = require('redis');
 // Create Redis client with authentication
 
 const client = redis.createClient({
-    url:'redis://127.0.0.1:6379',
+    url:'redis://'+process.env.REDISURL,
     // password: 'redis123' // Replace with your Redis password
 });
 

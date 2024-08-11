@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('dotenv').config({path:`.env.${process.env.ENVIRONMENT ||'dev'}`});
 const app = require('./src/app');
 const {conncetDB} = require('./src/lib/db-handeler');
 const redis = require("./src/lib/redis-config");
